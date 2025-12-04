@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marketplace Activity Analyzer</title>
+  <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <h1>📊 Marketplace Analyzer</h1>
+      <button id="settings-btn" class="settings-btn">⚙️</button>
+    </div>
+    
+    <div class="stats-panel">
+      <div class="stat-card">
+        <div class="stat-label">Total Activities</div>
+        <div class="stat-value" id="total-activities">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Listings</div>
+        <div class="stat-value" id="total-listings">0</div>
+      </div>
+    </div>
+    
+    <div class="activity-section">
+      <h3>Recent Activity</h3>
+      <ul class="activity-list" id="activity-list">
+        <li class="empty-state">No activity yet</li>
+      </ul>
+    </div>
+    
+    <div class="action-buttons">
+      <button id="clear-btn" class="btn btn-danger">Clear Data</button>
+      <button id="export-btn" class="btn btn-primary">Export</button>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
