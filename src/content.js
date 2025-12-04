@@ -1,158 +1,86 @@
-// Content Script - Injected into marketplace pages
+console.log('Marketplace Analyzer Content Script Loaded');
 
-// Initialize listener for page messages
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return;
-  if (!event.data.fromMarketplaceAnalyzer) return;
-  
-  const action = event.data.action;
-  
-  if (action === 'COLLECT_LISTING_DATA') {
-    const listingData = collectListingData();
-    chrome.runtime.sendMessage({
-      action: 'saveActivity',
-      data: {
-        type: 'listing_viewed',
-        marketplace: detectMarketplace(),
-        listingId: listingData.id,
-        listingTitle: listingData.title,
-        details: listingData
-      }
-    });
-  }
-});
+const STORAGE_KEYS = {
+  ACTIVITY_LOG: 'activity_log',
+  LISTINGS: 'listings_data'
+};
 
-// Listen for messages from background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getListingData') {
-    sendResponse({ data: collectListingData() });
-  } else if (request.action === 'injectTracking') {
-    injectTrackingCode();
-    sendResponse({ status: 'injected' });
-  }
-});
+const MARKETPLACES = {
+  avito: { domain: 'avito.ru', selector: '[data-marker]' },
+  ozon: { domain: 'ozon.ru', selector: '[data-productid]' },
+  yandex: { domain: 'market.yandex.ru', selector: '[data-autotest-id*="product"]' },
+  aliexpress: { domain: 'aliexpress.com', selector: '[data-product-id]' },
+  ebay: { domain: 'ebay.com', selector: '[data-itemid]' }
+};
 
-function detectMarketplace() {
+function getCurrentMarketplace() {
   const hostname = window.location.hostname;
-  if (hostname.includes('avito')) return 'avito';
-  if (hostname.includes('market.yandex')) return 'yandex_market';
-  if (hostname.includes('ozon')) return 'ozon';
-  if (hostname.includes('aliexpress')) return 'aliexpress';
-  if (hostname.includes('ebay')) return 'ebay';
-  return 'unknown';
+  for (const [key, config] of Object.entries(MARKETPLACES)) {
+    if (hostname.includes(config.domain)) {
+      return { name: key, config };
+    }
+  }
+  return null;
 }
 
 function collectListingData() {
-  const marketplace = detectMarketplace();
-  let data = {
-    id: generateListingId(),
-    title: '',
-    price: '',
-    currency: '',
-    seller: '',
-    date: new Date().toISOString(),
-    url: window.location.href
-  };
+  const marketplace = getCurrentMarketplace();
+  if (!marketplace) return null;
+
+  const listingItems = document.querySelectorAll(marketplace.config.selector);
+  const listings = [];
+
+  listingItems.forEach((item, index) => {
+    if (index < 50) {
+      const title = item.textContent?.substring(0, 100) || 'Unknown';
+      listings.push({
+        id: Math.random().toString(36).substr(2, 9),
+        title: title.trim(),
+        marketplace: marketplace.name,
+        timestamp: Date.now(),
+        url: window.location.href
+      });
+    }
+  });
+
+  return listings;
+}
+
+function trackActivity() {
+  console.log('Tracking activity...');
+  const listings = collectListingData();
   
-  switch(marketplace) {
-    case 'avito':
-      data = { ...data, ...parseAvitoData() };
-      break;
-    case 'yandex_market':
-      data = { ...data, ...parseYandexMarketData() };
-      break;
-    case 'ozon':
-      data = { ...data, ...parseOzonData() };
-      break;
-    case 'aliexpress':
-      data = { ...data, ...parseAliexpressData() };
-      break;
-    case 'ebay':
-      data = { ...data, ...parseEbayData() };
-      break;
-  }
-  
-  return data;
-}
-
-function parseAvitoData() {
-  const data = {};
-  try {
-    const titleEl = document.querySelector('[itemprop="name"]');
-    const priceEl = document.querySelector('[itemprop="price"]');
-    data.title = titleEl ? titleEl.innerText : '';
-    data.price = priceEl ? priceEl.getAttribute('content') : '';
-  } catch (e) {
-    console.log('Error parsing Avito data:', e);
-  }
-  return data;
-}
-
-function parseYandexMarketData() {
-  const data = {};
-  try {
-    const titleEl = document.querySelector('h1');
-    data.title = titleEl ? titleEl.innerText : '';
-  } catch (e) {
-    console.log('Error parsing Yandex Market data:', e);
-  }
-  return data;
-}
-
-function parseOzonData() {
-  const data = {};
-  try {
-    const titleEl = document.querySelector('[data-testid="breadcrumbs"]')?.nextElementSibling?.querySelector('h1');
-    data.title = titleEl ? titleEl.innerText : '';
-  } catch (e) {
-    console.log('Error parsing Ozon data:', e);
-  }
-  return data;
-}
-
-function parseAliexpressData() {
-  const data = {};
-  try {
-    const titleEl = document.querySelector('.product-title');
-    data.title = titleEl ? titleEl.innerText : '';
-  } catch (e) {
-    console.log('Error parsing Aliexpress data:', e);
-  }
-  return data;
-}
-
-function parseEbayData() {
-  const data = {};
-  try {
-    const titleEl = document.querySelector('.it-ttl');
-    data.title = titleEl ? titleEl.innerText : '';
-  } catch (e) {
-    console.log('Error parsing eBay data:', e);
-  }
-  return data;
-}
-
-function injectTrackingCode() {
-  const script = document.createElement('script');
-  script.textContent = `
-    document.addEventListener('click', (e) => {
-      const listing = e.target.closest('[data-item-id], .item, .product');
-      if (listing) {
-        window.postMessage({
-          fromMarketplaceAnalyzer: true,
-          action: 'COLLECT_LISTING_DATA'
-        }, '*');
+  if (listings && listings.length > 0) {
+    chrome.runtime.sendMessage({
+      action: 'TRACK_ACTIVITY',
+      data: {
+        type: 'listings_viewed',
+        count: listings.length,
+        listings: listings,
+        timestamp: Date.now(),
+        url: window.location.href
+      }
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('Message sent (background might be inactive)');
+      } else {
+        console.log('Activity tracked:', response);
       }
     });
-  `;
-  document.documentElement.appendChild(script);
-  script.remove();
+  }
 }
 
-function generateListingId() {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('id') || urlParams.get('item') || Math.random().toString(36).substr(2, 9);
-}
+window.addEventListener('load', () => {
+  console.log('Page loaded, starting tracking...');
+  trackActivity();
+});
 
-// Auto-inject tracking on page load
-injectTrackingCode();
+window.addEventListener('scroll', () => {
+  trackActivity();
+}, { passive: true });
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-productid], [data-marker], [data-itemid]')) {
+    trackActivity();
+  }
+}, true);
