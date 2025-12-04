@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Marketplace Activity Analyzer",
+  "version": "1.0.0",
+  "description": "Browser extension for analyzing marketplace activity (Avito, Yandex Market, etc.)",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://avito.ru/*",
+    "https://market.yandex.ru/*",
+    "https://ozon.ru/*",
+    "https://aliexpress.com/*",
+    "https://*.aliexpress.com/*",
+    "https://ebay.com/*",
+    "https://*.ebay.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://avito.ru/*",
+        "https://market.yandex.ru/*",
+        "https://ozon.ru/*",
+        "https://aliexpress.com/*",
+        "https://*.aliexpress.com/*",
+        "https://ebay.com/*",
+        "https://*.ebay.com/*"
+      ],
+      "js": ["src/content.js"],
+      "css": ["src/styles/content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Marketplace Activity Analyzer",
+    "default_icons": {
+      "16": "src/icons/icon-16.png",
+      "48": "src/icons/icon-48.png",
+      "128": "src/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "src/icons/icon-16.png",
+    "48": "src/icons/icon-48.png",
+    "128": "src/icons/icon-128.png"
+  }
+}
