@@ -3,6 +3,11 @@
   "name": "Marketplace Activity Analyzer",
   "version": "1.0.0",
   "description": "Browser extension for analyzing marketplace activity (Avito, Yandex Market, etc.)",
+  "icons": {
+    "16": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
+  },
   "permissions": [
     "storage",
     "activeTab",
@@ -31,22 +36,11 @@
         "https://ebay.com/*",
         "https://*.ebay.com/*"
       ],
-      "js": ["src/content.js"],
-      "css": ["src/styles/content.css"]
+      "js": ["src/content.js"]
     }
   ],
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Marketplace Activity Analyzer",
-    "default_icons": {
-      "16": "src/icons/icon-16.png",
-      "48": "src/icons/icon-48.png",
-      "128": "src/icons/icon-128.png"
-    }
-  },
-  "icons": {
-    "16": "src/icons/icon-16.png",
-    "48": "src/icons/icon-48.png",
-    "128": "src/icons/icon-128.png"
+    "default_title": "Marketplace Activity Analyzer"
   }
 }
