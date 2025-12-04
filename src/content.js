@@ -6,11 +6,31 @@ const STORAGE_KEYS = {
 };
 
 const MARKETPLACES = {
-  avito: { domain: 'avito.ru', selector: '[data-marker]' },
-  ozon: { domain: 'ozon.ru', selector: '[data-productid]' },
-  yandex: { domain: 'market.yandex.ru', selector: '[data-autotest-id*="product"]' },
-  aliexpress: { domain: 'aliexpress.com', selector: '[data-product-id]' },
-  ebay: { domain: 'ebay.com', selector: '[data-itemid]' }
+  avito: { 
+    domain: 'avito.ru', 
+    selector: '[data-marker]',
+    salesSelector: '[data-marker] [class*="sales"]'
+  },
+  ozon: { 
+    domain: 'ozon.ru', 
+    selector: '[data-productid]',
+    salesSelector: '[class*="sales"], [class*="sold"], [data-test*="sales"]'
+  },
+  yandex: { 
+    domain: 'market.yandex.ru', 
+    selector: '[data-autotest-id*="product"]',
+    salesSelector: '[data-test*="rating"], [class*="sales"]'
+  },
+  aliexpress: { 
+    domain: 'aliexpress.com', 
+    selector: '[data-product-id]',
+    salesSelector: '[class*="Sold"], [class*="sold"], [class*="buyers"]'
+  },
+  ebay: { 
+    domain: 'ebay.com', 
+    selector: '[data-itemid]',
+    salesSelector: '[class*="SOLD"], [class*="sold"]'
+  }
 };
 
 let activityCounter = 0;
@@ -25,6 +45,61 @@ function getCurrentMarketplace() {
   return null;
 }
 
+function extractSalesCount(element, marketplace) {
+  try {
+    let salesCount = 0;
+    let salesText = '';
+    
+    if (marketplace === 'ozon') {
+      const ratingEl = element.querySelector('[class*="rating"]');
+      const soldEl = element.querySelector('[class*="sold"]');
+      if (ratingEl) {
+        const match = ratingEl.textContent.match(/(\d+)\s*(?:продано|sold|buyers)/i);
+        if (match) salesCount = parseInt(match[1]);
+      }
+      if (soldEl) {
+        const match = soldEl.textContent.match(/(\d+)/);
+        if (match) salesCount = parseInt(match[1]);
+      }
+    } 
+    else if (marketplace === 'avito') {
+      const ratingEl = element.querySelector('[class*="rating"]');
+      if (ratingEl) {
+        const match = ratingEl.textContent.match(/(\d+)/);
+        if (match) salesCount = parseInt(match[1]);
+      }
+    }
+    else if (marketplace === 'yandex') {
+      const ratingEl = element.querySelector('[data-test*="rating"]');
+      if (ratingEl) {
+        const match = ratingEl.textContent.match(/(\d+)/);
+        if (match) salesCount = parseInt(match[1]);
+      }
+    }
+    else if (marketplace === 'aliexpress') {
+      const buyersEl = element.querySelector('[class*="Buyers"]') || 
+                      element.querySelector('[class*="buyers"]');
+      if (buyersEl) {
+        const match = buyersEl.textContent.match(/(\d+)/);
+        if (match) salesCount = parseInt(match[1]);
+      }
+    }
+    else if (marketplace === 'ebay') {
+      const soldEl = element.querySelector('[class*="SOLD"]') ||
+                    element.querySelector('[class*="sold"]');
+      if (soldEl) {
+        const match = soldEl.textContent.match(/(\d+)/);
+        if (match) salesCount = parseInt(match[1]);
+      }
+    }
+    
+    return salesCount;
+  } catch (error) {
+    console.log('Error extracting sales:', error);
+    return 0;
+  }
+}
+
 function collectListingData() {
   const marketplace = getCurrentMarketplace();
   if (!marketplace) return null;
@@ -33,14 +108,17 @@ function collectListingData() {
   const listings = [];
 
   listingItems.forEach((item, index) => {
-    if (index < 50) {
+    if (index < 100) {
       const title = item.textContent?.substring(0, 100) || 'Unknown';
+      const salesCount = extractSalesCount(item, marketplace.name);
+      
       listings.push({
         id: Math.random().toString(36).substr(2, 9),
         title: title.trim(),
         marketplace: marketplace.name,
         timestamp: Date.now(),
         url: window.location.href,
+        sales: salesCount,
         element: item
       });
     }
@@ -74,13 +152,14 @@ function trackActivity() {
   }
 }
 
-function createTooltip(element, count) {
+function createTooltip(element, count, maxSales) {
   const tooltip = document.createElement('div');
   tooltip.className = 'marketplace-analyzer-tooltip';
   tooltip.innerHTML = `
-    <div style="font-weight: bold; color: #667eea; margin-bottom: 5px;">📊 Activity</div>
-    <div style="font-size: 14px; color: #333;">Товаров: <strong>${count}</strong></div>
-    <div style="font-size: 12px; color: #999; margin-top: 3px;">На этой странице отслежено</div>
+    <div style="font-weight: bold; color: #667eea; margin-bottom: 5px;">📊 Analytics</div>
+    <div style="font-size: 13px; color: #333; margin-bottom: 3px;">Товаров: <strong>${count}</strong></div>
+    <div style="font-size: 13px; color: #e74c3c; margin-bottom: 3px;">📈 Продано: <strong>${maxSales > 0 ? maxSales : 'N/A'}</strong></div>
+    <div style="font-size: 11px; color: #999; margin-top: 5px;">На этой странице</div>
   `;
   
   tooltip.style.cssText = `
@@ -140,6 +219,8 @@ function attachHoverListeners() {
   const listings = collectListingData();
   if (!listings) return;
 
+  const maxSales = Math.max(...listings.map(l => l.sales || 0));
+
   listings.forEach((listing) => {
     if (listing.element) {
       let tooltip = null;
@@ -148,11 +229,11 @@ function attachHoverListeners() {
         const rect = listing.element.getBoundingClientRect();
         
         if (!tooltip) {
-          tooltip = createTooltip(listing.element, listings.length);
+          tooltip = createTooltip(listing.element, listings.length, listing.sales);
         }
         
-        tooltip.style.left = (rect.left + rect.width / 2 - 60) + 'px';
-        tooltip.style.top = (rect.top - 70) + 'px';
+        tooltip.style.left = (rect.left + rect.width / 2 - 80) + 'px';
+        tooltip.style.top = (rect.top - 80) + 'px';
         tooltip.style.opacity = '1';
         tooltip.classList.remove('hide');
       });
